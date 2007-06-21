@@ -1,4 +1,7 @@
 
 
 all:
-	cd src && erlc *.erl
+	cd src && make
+
+clean:
+	cd src && make clean

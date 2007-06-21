@@ -1,0 +1,20 @@
+
+OneCached (c) 2007 Process-one (http://www.process-one.net/)
+============================================================
+
+OneCached is a memcached (http://danga.com/memcached/) implementation
+writen in Erlang (http://erlang.org/).
+
+COMPILATION
+-----------
+
+make
+
+RUNNING
+-------
+
+go to src and run
+
+erl -sname onecached -s onecached -mnesia dir '"/path/to/database"'
+
+/path/to/database is where to store the file storage.

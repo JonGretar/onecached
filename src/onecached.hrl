@@ -5,8 +5,6 @@
 
 -record(storage_command, {key, flags, exptime, bytes, data=""}).
 
-
-
 -define(FSMOPTS, [{debug, [trace]}]).
 %-define(FSMOPTS, []).
 
