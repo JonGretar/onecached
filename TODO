@@ -1,3 +1,4 @@
 
-* start sasl
+* implement all commands
+* support for second time argument support for delete command
 * virtual hosts ?

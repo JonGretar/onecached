@@ -91,16 +91,17 @@ read_line([Char|Data], Line) ->
 %% FSM Callbacks
 %%====================================================================
 
-% process a memcached storage command line
+% memcached "set" storage command line
 process_command({line, "set "++Line}, StateData) ->
     io:format("process_command set"),
     {next_state, process_data_block, StateData#state{command=parse_storage_command(Line)}};
+% memcached "add" storage command line
 process_command({line, "add "++Line}, StateData) ->
     StorageCommand = parse_storage_command(Line),
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case onecached_storage:has_key(StateData#state.storage, Key) of
+	    case onecached_storage:has_item(StateData#state.storage, Key) of
 		true ->
 		    {next_state, discard_data_block, NewStorageCommand};
 		false ->
@@ -112,12 +113,13 @@ process_command({line, "add "++Line}, StateData) ->
 	    {next_state, process_command, StateData}
     end;
 
+% memcached "replace" storage command line
 process_command({line, "replace "++Line}, StateData) ->
     StorageCommand = parse_storage_command(Line),
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case onecached_storage:has_key(StateData#state.storage, Key) of
+	    case onecached_storage:has_item(StateData#state.storage, Key) of
 		true ->
 		    {next_state, process_data_block, NewStorageCommand};
 		false ->
@@ -129,7 +131,7 @@ process_command({line, "replace "++Line}, StateData) ->
 	    {next_state, process_command, StateData}
     end;
 
-% process a memcached retrieval command line
+% memcached "get" retrieval command line
 process_command({line, "get "++Line}, #state{socket=Socket, storage=Storage}=StateData) ->
     Keys = parse_retrieval_command(Line),
     lists:foreach(fun(Key) ->
@@ -138,7 +140,28 @@ process_command({line, "get "++Line}, #state{socket=Socket, storage=Storage}=Sta
     send_command(Socket, "END"),
     {next_state, process_command, StateData};
 
-% unknown command
+% memcached "delete" command line
+% TODO second time argument support
+process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=StateData) ->
+    case parse_delete_command(Line) of
+	{Key, _Time} ->
+	    case onecached_storage:delete_item(Storage, Key) of
+		ok ->
+		    send_command(Socket, "DELETED");
+		none ->
+		    send_command(Socket, "NOT_FOUND");
+		Other ->
+		    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Other]),
+		    send_command(Socket, io_lib:format("SERVER_ERROR ~p", [Other]))
+	    end;
+	_ ->
+	    ?ERROR_MSG("CLIENT_ERROR invalid delete command format~n~p~n", [Line]),
+	    send_command(Socket, "CLIENT_ERROR invalid delete command format: delete "++Line)
+    end,
+    {next_state, process_command, StateData};
+
+
+% unknown memcached command
 process_command({line, Line}, #state{socket=Socket} = StateData) ->
     ?ERROR_MSG("CLIENT_ERROR unknown command~n~p~n", [Line]),
     send_command(Socket, "CLIENT_ERROR unknown command "++Line),
@@ -286,3 +309,21 @@ parse_storage_command(Line) ->
 % return [Key] when is_list(Key)
 parse_retrieval_command(Line) ->
     string:tokens(Line, " ").
+
+% Format of Line is
+% <key> <time>
+% return {Key, Time}
+parse_delete_command(Line) ->
+    case string:tokens(Line, " ") of
+	[Key, STime] ->
+	    case string:to_integer(STime) of
+		{Time, ""} ->
+		    {Key, Time};
+		_ ->
+		    error
+	    end;
+	[Key] ->
+	    {Key, 0};
+	_ ->
+	    error
+    end.

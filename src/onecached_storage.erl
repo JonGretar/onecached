@@ -5,8 +5,9 @@
 
 -export([init/1,
 	 store_item/2,
-	 has_key/2,
-	 get_item/2]).
+	 has_item/2,
+	 get_item/2,
+	 delete_item/2]).
 
 -include("onecached.hrl").
 
@@ -37,7 +38,7 @@ store_item(mnesia, #storage_command{exptime=Exptime} = StorageCommand) ->
     store_item(mnesia, StorageCommand#storage_command{exptime=Exptime + (MegaSecs*1000+Secs)}).
 
 % return true if a item with Key is present
-has_key(Storage, Key) ->
+has_item(Storage, Key) ->
     case get_item(Storage, Key) of
 	{ok, _} ->
 	    true;
@@ -77,4 +78,12 @@ get_item(mnesia, Key) ->
 	    Result;
 	{aborted, Reason} ->
 	    {error, Reason}
+    end.
+
+delete_item(mnesia, Key) ->
+    case has_item(mnesia, Key) of
+	true ->
+	    mnesia:dirty_delete({onecached, Key});
+	false ->
+	    none
     end.
