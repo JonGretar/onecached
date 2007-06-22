@@ -7,11 +7,16 @@
 	 store_item/2,
 	 has_item/2,
 	 get_item/2,
-	 delete_item/2]).
+	 delete_item/2,
+	 update_item_value/4]).
 
 -include("onecached.hrl").
 
 -record(onecached, {key, flags, exptime, data}).
+
+%%====================================================================
+%% API functions
+%%====================================================================
 
 init(mnesia) ->
     mnesia:change_table_copy_type(schema, node(), disc_copies),
@@ -47,38 +52,14 @@ has_item(Storage, Key) ->
     end.
 
 % Find the item with key Key, return
-% {ok, Flags, Data}
+% {ok, {Flags, Data}}
 % if found or
 % none
 % if not found or if the item has expired
 % (in the later case, delete the item) or
 % {error, Reason}
 get_item(mnesia, Key) ->
-    Fun = fun() ->
-		  case mnesia:read({onecached, Key}) of
-		      [#onecached{exptime=0, flags = Flags, data = Data}] ->
-			  {ok, Flags, Data};
-		      [#onecached{exptime=Exptime, flags = Flags, data = Data}] ->
-			  {MegaSecs, Secs, _MicroSecs} = now(),
-			  case Exptime > MegaSecs*1000+Secs of
-			      true ->
-				  {ok, {Flags, Data}};
-			      false ->
-				  mnesia:delete({onecached, Key}),
-				  none
-			  end;
-		      [] ->
-			  none;
-		      {'EXIT', Reason} ->
-			  {error, Reason}
-		  end
-	  end,
-    case mnesia:transaction(Fun) of
-	{atomic, Result} ->
-	    Result;
-	{aborted, Reason} ->
-	    {error, Reason}
-    end.
+    mnesia_get(Key, value, dirty).
 
 delete_item(mnesia, Key) ->
     case has_item(mnesia, Key) of
@@ -86,4 +67,101 @@ delete_item(mnesia, Key) ->
 	    mnesia:dirty_delete({onecached, Key});
 	false ->
 	    none
+    end.
+
+% Update the value of item with the result of
+% Operation(ItemValue, Value)
+% result value will be >=0
+% return {ok, Value} if ok
+update_item_value(mnesia, Key, Value, Operation) ->
+    F = fun() ->
+		case mnesia_get(Key, record, write) of
+		    {ok, #onecached{data = OldValue} = Item}
+		    when is_integer(OldValue) ->
+			update_value(Item, OldValue, Value, Operation);
+		    {ok, #onecached{data = Data} = Item} ->
+			case string:to_integer(Data) of
+			    {OldValue, ""} ->
+				update_value(Item, OldValue, Value, Operation);
+			    _ ->
+				update_value(Item, 0, Value, Operation)
+			end;
+		    Other ->
+			Other
+		end
+	end,
+    case mnesia:transaction(F) of
+	{atomic, Result} ->
+	    Result;
+	Other ->
+	    Other
+    end.
+
+
+%%====================================================================
+%% Internal functions for mnesia backend
+%%====================================================================
+
+% if Return == value, return
+% {ok, {Flags, Value}}
+% if Return == record, return
+% {ok, #onecached}
+% or none if not found
+% LockType is dirty, read or write
+mnesia_get(Key, Return, LockType) ->
+    Lock = case LockType of
+	       dirty ->
+		    % fake lock, will be run outside of a transaction
+		    % anyway
+		   read;
+	       _ ->
+		   LockType
+	   end,
+    F= fun () ->
+	       case mnesia:read(onecached, Key, Lock) of
+		   [#onecached{exptime=0} = Item] ->
+		       {ok, item_value(Return, Item)};
+		   [#onecached{exptime=Exptime} = Item] ->
+		       {MegaSecs, Secs, _MicroSecs} = now(),
+		       case Exptime > MegaSecs*1000+Secs of
+			   true ->
+			       {ok, item_value(Return, Item)};
+			   false ->
+			       mnesia:delete_object(Item),
+			       none
+		       end;
+		   [] ->
+		       none;
+		   {'EXIT', Reason} ->
+		       {error, Reason}
+	       end
+       end,
+    case LockType of
+	dirty ->
+	    mnesia:async_dirty(F);
+	_ ->
+	    F()
+    end.
+item_value(value, #onecached{flags = Flags, data = Data}) ->
+    {Flags, Data};
+item_value(record, Item) when is_record(Item, onecached) ->
+    Item.
+
+
+% Write the updated item.
+% return {ok, Value} if ok
+update_value(Item, OldValue, Value, Operation) ->
+    NewValue = case Operation(OldValue, Value) of
+		   Result when Result < 0 ->
+		       0;
+		   Result ->
+		       Result
+	       end,
+    case mnesia:write(Item#onecached{data=NewValue}) of
+	{'EXIT', Reason} ->
+	    {error, Reason};
+	ok ->
+	    {ok, NewValue};
+	Other ->
+	    Other
     end.
