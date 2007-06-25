@@ -1,7 +1,13 @@
--module(onecached_storage).
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
 
+-module(onecached_storage).
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
+
+% Handle all storage mechanisms (only mnesia for now).
 
 -export([init/1,
 	 store_item/2,

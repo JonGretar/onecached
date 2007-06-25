@@ -1,4 +1,5 @@
 
 * implement all commands
 * support for second time argument support for delete command
+* UDP support
 * virtual hosts ?

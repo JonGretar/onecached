@@ -1,8 +1,15 @@
--module(onecached_app).
--behaviour(application).
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
 
+-module(onecached_app).
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
+
+% Start the OneCached application
+
+-behaviour(application).
 
 -export([start/2,
 	 stop/1

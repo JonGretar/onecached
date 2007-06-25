@@ -1,8 +1,15 @@
--module(onecached_sup).
--behaviour(supervisor).
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
 
+-module(onecached_sup).
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
+
+% Supervisor of the OneCached listener
+
+-behaviour(supervisor).
 
 -export([start_link/0]).
 -export([init/1]).

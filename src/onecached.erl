@@ -1,8 +1,13 @@
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
 
 -module(onecached).
-
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
+
+% Start all applications needed by OneCached
 
 -export([start/0,
 	 stop/0

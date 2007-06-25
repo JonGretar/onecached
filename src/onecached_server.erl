@@ -1,4 +1,14 @@
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
+
 -module(onecached_server).
+-author('jerome.sautret@process-one.net').
+-vsn('$Revision$ ').
+
+% Code for the threads that handle client connexions
+
 -behaviour(gen_fsm).
 
 -define(VERSION, "OneCached v0.1 by Process-one (http://www/process-one.net/)").

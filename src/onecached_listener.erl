@@ -1,5 +1,13 @@
+%%%----------------------------------------------------------------------
+%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% $Id$
+%%%----------------------------------------------------------------------
 
 -module(onecached_listener).
+-author('jerome.sautret@process-one.net').
+-vsn('$Revision$ ').
+
+% Listen to clients connexions and spawn onecached_server
 
 -include("onecached.hrl").
 
