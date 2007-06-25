@@ -141,6 +141,12 @@ process_command({line, "get "++Line}, #state{socket=Socket, storage=Storage}=Sta
     send_command(Socket, "END"),
     {next_state, process_command, StateData};
 
+% memcached "incr" command line
+process_command({line, "incr "++Line}, StateData) ->
+    process_incr_decr_command(fun(A, B) -> A+B end, Line, StateData);
+process_command({line, "decr "++Line}, StateData) ->
+    process_incr_decr_command(fun(A, B) -> A-B end, Line, StateData);
+
 % memcached "delete" command line
 % TODO second time argument support
 process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=StateData) ->
@@ -173,17 +179,9 @@ process_command({line, "flush_all"++_Line}, #state{socket=Socket, storage=Storag
     end,
     {next_state, process_command, StateData};
 
-% memcached "version" command line
-process_command({line, "version"}, #state{socket=Socket}=StateData) ->
-    send_command(Socket, "VERSION "++?VERSION),
-    {next_state, process_command, StateData};
-
-% memcached "incr" command line
-process_command({line, "incr "++Line}, StateData) ->
-    process_incr_decr_command(fun(A, B) -> A+B end, Line, StateData);
-process_command({line, "decr "++Line}, StateData) ->
-    process_incr_decr_command(fun(A, B) -> A-B end, Line, StateData);
-
+% memcached "quit" command line
+process_command({line, "quit"}, StateData) ->
+    {stop, normal, StateData};
 
 % unknown memcached command
 process_command({line, Line}, #state{socket=Socket} = StateData) ->
