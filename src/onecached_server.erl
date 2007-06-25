@@ -1,6 +1,8 @@
 -module(onecached_server).
 -behaviour(gen_fsm).
 
+-define(VERSION, "OneCached v0.1 by Process-one (http://www/process-one.net/)").
+
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
 
@@ -169,6 +171,11 @@ process_command({line, "flush_all"++_Line}, #state{socket=Socket, storage=Storag
 	    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Other]),
 	    send_command(Socket, io_lib:format("SERVER_ERROR ~p", [Other]))
     end,
+    {next_state, process_command, StateData};
+
+% memcached "version" command line
+process_command({line, "version"}, #state{socket=Socket}=StateData) ->
+    send_command(Socket, "VERSION "++?VERSION),
     {next_state, process_command, StateData};
 
 % memcached "incr" command line
