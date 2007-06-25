@@ -159,6 +159,18 @@ process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=
     end,
     {next_state, process_command, StateData};
 
+% memcached "flush_all" command line
+% TODO second time argument support
+process_command({line, "flush_all"++_Line}, #state{socket=Socket, storage=Storage}=StateData) ->
+    case onecached_storage:flush_items(Storage) of
+	ok ->
+	    send_command(Socket, "OK");
+	Other ->
+	    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Other]),
+	    send_command(Socket, io_lib:format("SERVER_ERROR ~p", [Other]))
+    end,
+    {next_state, process_command, StateData};
+
 % memcached "incr" command line
 process_command({line, "incr "++Line}, StateData) ->
     process_incr_decr_command(fun(A, B) -> A+B end, Line, StateData);

@@ -8,7 +8,8 @@
 	 has_item/2,
 	 get_item/2,
 	 delete_item/2,
-	 update_item_value/4]).
+	 update_item_value/4,
+	 flush_items/1]).
 
 -include("onecached.hrl").
 
@@ -97,6 +98,13 @@ update_item_value(mnesia, Key, Value, Operation) ->
 	    Other
     end.
 
+flush_items(mnesia) ->
+    case mnesia:clear_table(onecached) of
+	{atomic, ok} ->
+	    ok;
+	{aborted, Reason} ->
+	    {error, Reason}
+    end.
 
 %%====================================================================
 %% Internal functions for mnesia backend
