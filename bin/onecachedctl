@@ -1,0 +1,54 @@
+#!/bin/bash
+
+###########################
+# Configuration
+###########################
+
+ERL=erl
+HOST=localhost
+
+###########################
+# End of configuration
+###########################
+
+function usage {
+	cat <<EoF
+Parameters:
+   start
+   stop
+   restart
+   status
+EoF
+	exit 2
+}
+
+if [[ x"$1" == x ]] ; then
+	usage
+fi
+
+
+NAME=onecached
+NODE=$NAME@$HOST
+ROOT="`dirname "$0"`"
+ROOT="`cd "$ROOT"/.. && pwd`"
+
+case "$1" in
+  start)
+	 if $0 status >/dev/null ; then
+	   echo "OneCached is already running."
+	   exit 4
+	 fi
+	 $ERL -noinput -detached -sname $NODE -s onecached \
+	  -mnesia dir \""$ROOT/database"\" -pa "$ROOT/ebin" \
+	  -sasl sasl_error_logger \{file,\"$ROOT/logs/sasl.log\"\}
+	 sleep 2
+	 $0 status
+	 ;;
+  *)
+     $ERL \
+      -noinput \
+      -sname onecachedctl@$HOST \
+      -pa "$ROOT/ebin" \
+      -s onecached_ctl -extra $NODE $@
+     ;;
+esac

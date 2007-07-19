@@ -20,4 +20,6 @@ start() ->
     application:start(onecached).
 
 stop() ->
-    application:stop(onecached).
+    application:stop(onecached),
+    application:stop(mnesia),
+    application:stop(sasl).

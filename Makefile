@@ -1,8 +1,8 @@
 
 
 all:
-	cd src && make
+	cd src && $(MAKE)
 
 clean:
 	rm -f *~
-	cd src && make clean
+	cd src && $(MAKE) clean
