@@ -14,8 +14,8 @@
 -define(DEBUG_MODE, true).
 
 -ifdef(DEBUG_MODE).
--define(DEBUG(Format, Args), io:format("D(~p:~p:~p) : "++Format++"~n",
-                                       [self(),?MODULE,?LINE]++Args)).
+-define(DEBUG(Format, Args), error_logger:info_msg("D(~p:~p:~p) : "++Format++"~n",
+						   [self(),?MODULE,?LINE]++Args)).
 -else.
 -define(DEBUG(F,A),[]).
 -endif.
