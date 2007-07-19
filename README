@@ -13,8 +13,4 @@ make
 RUNNING
 -------
 
-go to src and run
-
-erl -sname onecached -s onecached -mnesia dir '"/path/to/database"'
-
-/path/to/database is where to store the file storage.
+bin/onecachedctl start
