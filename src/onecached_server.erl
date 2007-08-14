@@ -112,11 +112,11 @@ process_command({line, "add "++Line}, StateData) ->
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case onecached_storage:has_item(StateData#state.storage, Key) of
-		true ->
-		    {next_state, discard_data_block, NewStorageCommand};
+	    case catch onecached_storage:has_item(StateData#state.storage, Key) of
 		false ->
-		    {next_state, process_data_block, NewStorageCommand}
+		    {next_state, process_data_block, NewStorageCommand};
+		_ ->
+		    {next_state, discard_data_block, NewStorageCommand}
 	    end;
 	_ ->
 	    ?ERROR_MSG("CLIENT_ERROR invalid command format~n~p~n", [Line]),
@@ -130,10 +130,10 @@ process_command({line, "replace "++Line}, StateData) ->
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case onecached_storage:has_item(StateData#state.storage, Key) of
+	    case catch onecached_storage:has_item(StateData#state.storage, Key) of
 		true ->
 		    {next_state, process_data_block, NewStorageCommand};
-		false ->
+		_ ->
 		    {next_state, discard_data_block, NewStorageCommand}
 	    end;
 	_ ->
@@ -162,7 +162,7 @@ process_command({line, "decr "++Line}, StateData) ->
 process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=StateData) ->
     case parse_delete_command(Line) of
 	{Key, _Time} ->
-	    case onecached_storage:delete_item(Storage, Key) of
+	    case catch onecached_storage:delete_item(Storage, Key) of
 		ok ->
 		    send_command(Socket, "DELETED");
 		none ->
@@ -180,7 +180,7 @@ process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=
 % memcached "flush_all" command line
 % TODO second time argument support
 process_command({line, "flush_all"++_Line}, #state{socket=Socket, storage=Storage}=StateData) ->
-    case onecached_storage:flush_items(Storage) of
+    case catch onecached_storage:flush_items(Storage) of
 	ok ->
 	    send_command(Socket, "OK");
 	Other ->
@@ -230,12 +230,12 @@ process_data_block({line, Line}, #state{socket=Socket,
     Bytes = StorageCommand#storage_command.bytes,
     case length(NewData) of
 	Bytes ->
-	    case onecached_storage:store_item(Storage, NewStorageCommand) of
+	    case catch onecached_storage:store_item(Storage, NewStorageCommand) of
 		ok ->
 		    send_command(Socket, "STORED");
-		{error, Reason} ->
-		    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Reason]),
-		    send_command(Socket, "SERVER_ERROR "++Reason)
+		Other ->
+		    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Other]),
+		    send_command(Socket, "SERVER_ERROR "++Other)
 	    end,
 	    {next_state, process_command, StateData#state{command=undefined}};
 	_Length ->
@@ -299,7 +299,7 @@ send_command(Socket, Command) ->
     gen_tcp:send(Socket, Command++"\r\n").
 
 send_item(Socket, Storage, Key) ->
-    case onecached_storage:get_item(Storage, Key) of
+    case catch onecached_storage:get_item(Storage, Key) of
 	{ok, {Flags, Data}} ->
 	    SData = case Data of
 			Value when is_integer(Value) ->
@@ -312,9 +312,9 @@ send_item(Socket, Storage, Key) ->
 	    send_command(Socket, SData);
 	none ->
 	    ok;
-	{error, Reason} ->
-	    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Reason]),
-	    send_command(Socket, "SERVER_ERROR "++Reason)
+	Other ->
+	    ?ERROR_MSG("SERVER_ERROR~n~p~n", [Other]),
+	    send_command(Socket, "SERVER_ERROR "++Other)
     end.
 
 %%====================================================================
@@ -386,7 +386,7 @@ parse_incr_decr_command(Line) ->
 process_incr_decr_command(Operation, Line, #state{socket=Socket, storage=Storage} = StateData) ->
     case parse_incr_decr_command(Line) of
 	{Key, Value} ->
-	    case onecached_storage:update_item_value(Storage, Key, Value, Operation) of
+	    case catch onecached_storage:update_item_value(Storage, Key, Value, Operation) of
 		{ok, NewValue} ->
 		    send_command(Socket, integer_to_list(NewValue));
 		none ->
