@@ -1,5 +1,5 @@
 %%%----------------------------------------------------------------------
-%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
+%%% OneCached (c) 2007-2008 ProcessOne (http://www.process-one.net/)
 %%% $Id$
 %%%----------------------------------------------------------------------
 
@@ -11,7 +11,7 @@
 
 -behaviour(gen_fsm).
 
--define(VERSION, "OneCached v0.1 by Process-one (http://www/process-one.net/)").
+-define(VERSION, "OneCached v1.0 by ProcessOne (http://www/process-one.net/)").
 
 -author('jerome.sautret@process-one.net').
 -vsn('$Revision$ ').
@@ -59,7 +59,7 @@ init(Socket) ->
 %% TCP server
 %%====================================================================
 
-% recieve TCP packets
+% receive TCP packets
 loop(FSM_Pid, Socket, Data) ->
     %?DEBUG("loop ~p~n", [Socket]),
     case gen_tcp:recv(Socket, 0) of

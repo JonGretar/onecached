@@ -5,6 +5,11 @@ OneCached (c) 2007 Process-one (http://www.process-one.net/)
 OneCached is a memcached (http://danga.com/memcached/) implementation
 writen in Erlang (http://erlang.org/).
 
+It supports the set, add, replace, get, incr, decr, delete, flush_all
+and quit commands. It doesn't handle expiration time.
+
+
+
 COMPILATION
 -----------
 
