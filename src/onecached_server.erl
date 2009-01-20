@@ -305,7 +305,9 @@ send_item(Socket, Storage, Key) ->
 			Value when is_integer(Value) ->
 			    integer_to_list(Value);
 			Value when is_list(Value) ->
-			    Value
+			    Value;
+			Value when is_binary(Value) ->
+			    binary_to_list(Value)
 		    end,
 	    send_command(Socket,
 			 io_lib:format("VALUE ~s ~w ~w", [Key, Flags, length(SData)])),

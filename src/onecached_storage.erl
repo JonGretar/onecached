@@ -31,13 +31,15 @@ init(mnesia) ->
 			[{disc_copies, [node()]},
 			 {attributes, record_info(fields, onecached)}]).
 
+store_item(mnesia, #storage_command{key=Key} = Command) when is_list(Key) ->
+    store_item(mnesia, Command#storage_command{key=list_to_binary(Key)});
 store_item(mnesia, #storage_command{key=Key, flags=Flags, exptime=Exptime, data=Data})
   when Exptime > 60*60*24*30 -> % (Exptime > 30 days), it is an absolute Unix time
     case mnesia:dirty_write(
 	   #onecached{key=Key,
-		       flags=Flags,
-		       exptime=Exptime,
-		       data=Data}) of
+		      flags=Flags,
+		      exptime=Exptime,
+		      data=list_to_binary(Data)}) of
 	{'EXIT', Reason} ->
 	    {error, Reason};
 	 Other ->
@@ -49,7 +51,9 @@ store_item(mnesia, #storage_command{exptime=Exptime} = StorageCommand) ->
     {MegaSecs, Secs, _MicroSecs} = now(),
     store_item(mnesia, StorageCommand#storage_command{exptime=Exptime + (MegaSecs*1000+Secs)}).
 
-% return true if a item with Key is present
+% return true if an item with Key is present
+has_item(Storage, Key) when is_list(Key) ->
+    has_item(Storage, list_to_binary(Key));
 has_item(Storage, Key) ->
     case get_item(Storage, Key) of
 	{ok, _} ->
@@ -65,9 +69,13 @@ has_item(Storage, Key) ->
 % if not found or if the item has expired
 % (in the later case, delete the item) or
 % {error, Reason}
+get_item(mnesia, Key) when is_list(Key) ->
+    get_item(mnesia, list_to_binary(Key));
 get_item(mnesia, Key) ->
     mnesia_get(Key, value, dirty).
 
+delete_item(mnesia, Key) when is_list(Key) ->
+    delete_item(mnesia, list_to_binary(Key));
 delete_item(mnesia, Key) ->
     case has_item(mnesia, Key) of
 	true ->
@@ -80,6 +88,8 @@ delete_item(mnesia, Key) ->
 % Operation(ItemValue, Value)
 % result value will be >=0
 % return {ok, Value} if ok
+update_item_value(mnesia, Key, Value, Operation) when is_list(Key) ->
+    update_item_value(mnesia, list_to_binary(Key), Value, Operation);
 update_item_value(mnesia, Key, Value, Operation) ->
     F = fun() ->
 		case mnesia_get(Key, record, write) of
