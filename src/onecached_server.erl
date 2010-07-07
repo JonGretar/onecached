@@ -112,7 +112,7 @@ process_command({line, "add "++Line}, StateData) ->
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case catch onecached_storage:has_item(StateData#state.storage, Key) of
+	    case catch onecached_storage:has_item(Key) of
 		false ->
 		    {next_state, process_data_block, NewStorageCommand};
 		_ ->
@@ -130,7 +130,7 @@ process_command({line, "replace "++Line}, StateData) ->
     case StorageCommand of
 	#storage_command{key=Key} ->
 	    NewStorageCommand = StateData#state{command=StorageCommand},
-	    case catch onecached_storage:has_item(StateData#state.storage, Key) of
+	    case catch onecached_storage:has_item(Key) of
 		true ->
 		    {next_state, process_data_block, NewStorageCommand};
 		_ ->
@@ -162,7 +162,7 @@ process_command({line, "decr "++Line}, StateData) ->
 process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=StateData) ->
     case parse_delete_command(Line) of
 	{Key, _Time} ->
-	    case catch onecached_storage:delete_item(Storage, Key) of
+	    case catch onecached_storage:delete_item(Key) of
 		ok ->
 		    send_command(Socket, "DELETED");
 		none ->
@@ -180,7 +180,7 @@ process_command({line, "delete "++Line}, #state{socket=Socket, storage=Storage}=
 % memcached "flush_all" command line
 % TODO second time argument support
 process_command({line, "flush_all"++_Line}, #state{socket=Socket, storage=Storage}=StateData) ->
-    case catch onecached_storage:flush_items(Storage) of
+    case catch onecached_storage:flush_items() of
 	ok ->
 	    send_command(Socket, "OK");
 	Other ->
@@ -230,7 +230,7 @@ process_data_block({line, Line}, #state{socket=Socket,
     Bytes = StorageCommand#storage_command.bytes,
     case length(NewData) of
 	Bytes ->
-	    case catch onecached_storage:store_item(Storage, NewStorageCommand) of
+	    case catch onecached_storage:store_item(NewStorageCommand) of
 		ok ->
 		    send_command(Socket, "STORED");
 		Other ->
@@ -299,7 +299,7 @@ send_command(Socket, Command) ->
     gen_tcp:send(Socket, Command++"\r\n").
 
 send_item(Socket, Storage, Key) ->
-    case catch onecached_storage:get_item(Storage, Key) of
+    case catch onecached_storage:get_item(Key) of
 	{ok, {Flags, Data}} ->
 	    SData = case Data of
 			Value when is_integer(Value) ->
@@ -388,7 +388,7 @@ parse_incr_decr_command(Line) ->
 process_incr_decr_command(Operation, Line, #state{socket=Socket, storage=Storage} = StateData) ->
     case parse_incr_decr_command(Line) of
 	{Key, Value} ->
-	    case catch onecached_storage:update_item_value(Storage, Key, Value, Operation) of
+	    case catch onecached_storage:update_item_value(Key, Value, Operation) of
 		{ok, NewValue} ->
 		    send_command(Socket, integer_to_list(NewValue));
 		none ->

@@ -1,191 +1,87 @@
-%%%----------------------------------------------------------------------
-%%% OneCached (c) 2007 Process-one (http://www.process-one.net/)
-%%% $Id$
-%%%----------------------------------------------------------------------
-
 -module(onecached_storage).
--author('jerome.sautret@process-one.net').
--vsn('$Revision$ ').
+-author('jongretar@jongretar.com').
+-behaviour(gen_server).
 
-% Handle all storage mechanisms (only mnesia for now).
+-export([behaviour_info/1]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([start_link/1,
+	store_item/1,
+	has_item/1,
+	get_item/1,
+	delete_item/1,
+	update_item_value/3,
+	flush_items/0]).
 
--export([init/1,
-	 store_item/2,
-	 has_item/2,
-	 get_item/2,
-	 delete_item/2,
-	 update_item_value/4,
-	 flush_items/1]).
+%% The State
+-record (state, {module, module_state}).
 
--include("onecached.hrl").
+%% Behaviour Part
+behaviour_info(callbacks) ->
+	[
+		{init,1},
+		{store_item,2},
+		{has_item,2},
+		{get_item,2},
+		{delete_item,2},
+		{update_item_value,4},
+		{flush_items,1}
+	];
+behaviour_info(_Other) ->
+	undefined.
 
--record(onecached, {key, flags, exptime, data}).
-
-%%====================================================================
-%% API functions
-%%====================================================================
-
-init(mnesia) ->
-    mnesia:change_table_copy_type(schema, node(), disc_copies),
-    mnesia:create_table(onecached,
-			[{disc_copies, [node()]},
-			 {attributes, record_info(fields, onecached)}]).
-
-store_item(mnesia, #storage_command{key=Key} = Command) when is_list(Key) ->
-    store_item(mnesia, Command#storage_command{key=list_to_binary(Key)});
-store_item(mnesia, #storage_command{key=Key, flags=Flags, exptime=Exptime, data=Data})
-  when Exptime > 60*60*24*30 -> % (Exptime > 30 days), it is an absolute Unix time
-    case mnesia:dirty_write(
-	   #onecached{key=Key,
-		      flags=Flags,
-		      exptime=Exptime,
-		      data=list_to_binary(Data)}) of
-	{'EXIT', Reason} ->
-	    {error, Reason};
-	 Other ->
-	    Other
-    end;
-
-store_item(mnesia, #storage_command{exptime=Exptime} = StorageCommand) ->
-    % Exptime is an offset
-    {MegaSecs, Secs, _MicroSecs} = now(),
-    store_item(mnesia, StorageCommand#storage_command{exptime=Exptime + (MegaSecs*1000+Secs)}).
-
-% return true if an item with Key is present
-has_item(Storage, Key) when is_list(Key) ->
-    has_item(Storage, list_to_binary(Key));
-has_item(Storage, Key) ->
-    case get_item(Storage, Key) of
-	{ok, _} ->
-	    true;
-	_ ->
-	    false
-    end.
-
-% Find the item with key Key, return
-% {ok, {Flags, Data}}
-% if found or
-% none
-% if not found or if the item has expired
-% (in the later case, delete the item) or
-% {error, Reason}
-get_item(mnesia, Key) when is_list(Key) ->
-    get_item(mnesia, list_to_binary(Key));
-get_item(mnesia, Key) ->
-    mnesia_get(Key, value, dirty).
-
-delete_item(mnesia, Key) when is_list(Key) ->
-    delete_item(mnesia, list_to_binary(Key));
-delete_item(mnesia, Key) ->
-    case has_item(mnesia, Key) of
-	true ->
-	    mnesia:dirty_delete({onecached, Key});
-	false ->
-	    none
-    end.
-
-% Update the value of item with the result of
-% Operation(ItemValue, Value)
-% result value will be >=0
-% return {ok, Value} if ok
-update_item_value(mnesia, Key, Value, Operation) when is_list(Key) ->
-    update_item_value(mnesia, list_to_binary(Key), Value, Operation);
-update_item_value(mnesia, Key, Value, Operation) ->
-    F = fun() ->
-		case mnesia_get(Key, record, write) of
-		    {ok, #onecached{data = OldValue} = Item}
-		    when is_integer(OldValue) ->
-			update_value(Item, OldValue, Value, Operation);
-		    {ok, #onecached{data = Data} = Item} ->
-			case string:to_integer(Data) of
-			    {OldValue, ""} ->
-				update_value(Item, OldValue, Value, Operation);
-			    _ ->
-				update_value(Item, 0, Value, Operation)
-			end;
-		    Other ->
-			Other
-		end
-	end,
-    case mnesia:transaction(F) of
-	{atomic, Result} ->
-	    Result;
-	Other ->
-	    Other
-    end.
-
-flush_items(mnesia) ->
-    case mnesia:clear_table(onecached) of
-	{atomic, ok} ->
-	    ok;
-	{aborted, Reason} ->
-	    {error, Reason}
-    end.
-
-%%====================================================================
-%% Internal functions for mnesia backend
-%%====================================================================
-
-% if Return == value, return
-% {ok, {Flags, Value}}
-% if Return == record, return
-% {ok, #onecached}
-% or none if not found
-% LockType is dirty, read or write
-mnesia_get(Key, Return, LockType) ->
-    Lock = case LockType of
-	       dirty ->
-		    % fake lock, will be run outside of a transaction
-		    % anyway
-		   read;
-	       _ ->
-		   LockType
-	   end,
-    F= fun () ->
-	       case mnesia:read(onecached, Key, Lock) of
-		   [#onecached{exptime=0} = Item] ->
-		       {ok, item_value(Return, Item)};
-		   [#onecached{exptime=Exptime} = Item] ->
-		       {MegaSecs, Secs, _MicroSecs} = now(),
-		       case Exptime > MegaSecs*1000+Secs of
-			   true ->
-			       {ok, item_value(Return, Item)};
-			   false ->
-			       mnesia:delete_object(Item),
-			       none
-		       end;
-		   [] ->
-		       none;
-		   {'EXIT', Reason} ->
-		       {error, Reason}
-	       end
-       end,
-    case LockType of
-	dirty ->
-	    mnesia:async_dirty(F);
-	_ ->
-	    F()
-    end.
-item_value(value, #onecached{flags = Flags, data = Data}) ->
-    {Flags, Data};
-item_value(record, Item) when is_record(Item, onecached) ->
-    Item.
+%% gen_server part
 
 
-% Write the updated item.
-% return {ok, Value} if ok
-update_value(Item, OldValue, Value, Operation) ->
-    NewValue = case Operation(OldValue, Value) of
-		   Result when Result < 0 ->
-		       0;
-		   Result ->
-		       Result
-	       end,
-    case mnesia:write(Item#onecached{data=NewValue}) of
-	{'EXIT', Reason} ->
-	    {error, Reason};
-	ok ->
-	    {ok, NewValue};
-	Other ->
-	    Other
-    end.
+% API
+start_link(Module) -> gen_server:start_link({local, ?MODULE}, ?MODULE, [Module], []).
+store_item(Item) -> gen_server:call(?MODULE, {store_item, Item}).
+has_item(Item) -> gen_server:call(?MODULE, {has_item, Item}).
+get_item(Item) -> gen_server:call(?MODULE, {get_item, Item}).
+delete_item(Item) -> gen_server:call(?MODULE, {delete_item, Item}).
+update_item_value(Key, Value, Operation) -> gen_server:call(?MODULE, {update_item_value, Key, Value, Operation}).
+flush_items() -> gen_server:call(?MODULE, {flush_items}).
+
+
+% Server implementation, a.k.a.: callbacks
+ 
+init([Module]) ->
+	ModuleState = Module:init([]), %% Add the passing of configuration over.
+	{ok, #state{module=Module, module_state=ModuleState}}.
+
+handle_call(stop, _From, State) ->
+	{stop, normal, stopped, State};
+
+handle_call(state, _From, State) ->
+	{reply, State, State};
+
+%
+handle_call({flush_items}, _From, State) ->
+	Module = State#state.module,
+	Reply = Module:flush_items(State#state.module_state),
+	{reply, Reply, State};
+handle_call({update_item_value, Key, Value, Operation}, _From, State) ->
+	Module = State#state.module,
+	Reply = Module:update_item_value(State#state.module_state, Key, Value, Operation),
+	{reply, Reply, State};
+handle_call({Command, Item}, _From, State) ->
+	Module = State#state.module,
+	Reply = Module:Command(State#state.module_state, Item),
+	{reply, Reply, State};
+
+handle_call(_Request, _From, State) ->
+	{reply, ok, State}.
+
+handle_cast(_Msg, State) ->
+	{noreply, State}.
+
+handle_info(_Info, State) ->
+	{noreply, State}.
+
+terminate(_Reason, _State) ->
+	ok.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+%% Helpers
+

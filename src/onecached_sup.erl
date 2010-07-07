@@ -18,7 +18,10 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init(_Args) ->
-    {ok, {{one_for_one, 1, 10},
-          [{onecached_listener, {onecached_listener, start_link, []},
-            permanent, brutal_kill, worker, [onecached_listener]}]
-	 }}.
+	{ok, StorageModule} = application:get_env(onecached, storage_module),
+	{ok, {{one_for_one, 1, 10}, [
+		{onecached_listener, {onecached_listener, start_link, []},
+			permanent, brutal_kill, worker, [onecached_listener]},
+		{onecached_storage, {onecached_storage, start_link, [StorageModule]},
+			permanent, brutal_kill, worker, [onecached_storage]}
+	]}}.

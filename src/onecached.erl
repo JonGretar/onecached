@@ -16,7 +16,6 @@
 start() ->
     application:start(sasl),
     application:start(mnesia),
-    onecached_storage:init(mnesia),
     application:start(onecached).
 
 stop() ->
