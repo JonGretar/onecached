@@ -8,5 +8,5 @@
    {registered,   [onecached_sup, onecached_listener]},
    {applications, [kernel, stdlib, sasl]},
    {mod, {onecached_app,[]}},
-   {env, [{storage_module, onecached_storage_mnesia}]}
+   {env, [{storage_module, onecached_storage_bitcask}]}
 ]}.
