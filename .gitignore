@@ -1,0 +1,8 @@
+*.app
+*.beam
+*.dump
+deps
+logs
+database
+bc_data
+
