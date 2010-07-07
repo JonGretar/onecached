@@ -39,16 +39,44 @@ get_item(State, Key) ->
 		not_found ->
 			none;
 		{ok, Value} ->
-			{ok, item_value(value, binary_to_term(Value))}
+			{ok, check_value(State, value, binary_to_term(Value))}
 	end.
 
-has_item(_State, _Val) -> ok.
-delete_item(_State, _Val) -> ok.
+% return true if an item with Key is present
+has_item(State, Key) when is_list(Key) ->
+	has_item(State, list_to_binary(Key));
+has_item(State, Key) ->
+	case get_item(State, Key) of
+		{ok, _} ->
+			true;
+		_ ->
+			false
+	end.
+
+delete_item(State, Key) when is_list(Key) ->
+	delete_item(State, list_to_binary(Key));
+delete_item(State, Key) ->
+	case has_item(State, Key) of
+		true ->
+			bitcask:delete(State,Key);
+		false ->
+			none
+	end.
+
 update_item_value(_State, _Key, _Value, _Operation) -> ok.
 flush_items(_State) -> ok.
 
 %% Private Functions
-item_value(value, #onecached{flags = Flags, data = Data}) ->
+check_value(_State, value, #onecached{flags=Flags, data=Data, exptime=Exptime }) when Exptime =< 0 ->
 	{Flags, Data};
-item_value(record, Item) when is_record(Item, onecached) ->
-	Item.
+check_value(State, value, #onecached{key=Key, flags=Flags, data=Data, exptime=Exptime }) ->
+	{MegaSecs, Secs, _MicroSecs} = now(),
+	case Exptime > MegaSecs*1000+Secs of
+		true ->
+			{Flags, Data};
+		false ->
+			delete_item(State, Key),
+			none
+	end.
+
+
