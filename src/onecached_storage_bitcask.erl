@@ -63,8 +63,16 @@ delete_item(State, Key) ->
 			none
 	end.
 
+flush_items(State) -> 
+	F = fun(K,_V,_Acc0) ->
+			bitcask:delete(State,K),
+			[]
+	end,
+	bitcask:fold(State,F,[]),
+	ok.
+
 update_item_value(_State, _Key, _Value, _Operation) -> ok.
-flush_items(_State) -> ok.
+
 
 %% Private Functions
 check_value(_State, value, #onecached{flags=Flags, data=Data, exptime=Exptime }) when Exptime =< 0 ->
