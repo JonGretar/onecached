@@ -39,8 +39,8 @@ case "$1" in
 	   exit 4
 	 fi
 	 $ERL -noinput -detached -sname $NODE -s onecached \
-	  -pa "deps/bitcask/ebin" -pa "deps/bitcask/deps/ebloom/ebin" \
-	  -mnesia dir \""$ROOT/database"\" -pa "$ROOT/ebin" \
+	  -pa "deps/bitcask/ebin" "deps/ebloom/ebin" "$ROOT/ebin" \
+	  -mnesia dir \""$ROOT/database"\" \
 	  -sasl sasl_error_logger \{file,\"$ROOT/logs/sasl.log\"\}
 	 sleep 2
 	 $0 status
@@ -51,8 +51,8 @@ case "$1" in
 	   exit 4
 	 fi
 	 $ERL -sname $NODE -s onecached \
-	  -pa "deps/bitcask/ebin" -pa "deps/bitcask/deps/ebloom/ebin" \
-	  -mnesia dir \""$ROOT/database"\" -pa "$ROOT/ebin" \
+	  -pa "deps/bitcask/ebin" "deps/ebloom/ebin" "$ROOT/ebin" \
+	  -mnesia dir \""$ROOT/database"\" \
 	  -sasl sasl_error_logger \{file,\"$ROOT/logs/sasl.log\"\}
 	 ;;
   *)
