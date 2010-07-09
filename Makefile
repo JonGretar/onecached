@@ -1,8 +1,27 @@
+.PHONY: rel deps
 
+all: deps compile
 
-all:
-	cd src && $(MAKE)
+compile:
+	./rebar compile
+
+deps:
+	./rebar get-deps
 
 clean:
-	rm -f *~
-	cd src && $(MAKE) clean
+	./rebar clean
+
+##
+## Release targets
+##
+rel:
+	rm -rf rel/onecached
+	./rebar compile generate
+
+relclean:
+	rm -rf rel/onecached
+
+install: rel
+
+test: 
+	./rebar eunit
